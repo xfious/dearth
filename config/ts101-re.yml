@@ -1,0 +1,79 @@
+training_name: ts101-re
+#ckpt_dir: ./ckpt
+#ckpt_name: ts10 # by default, ckpt_name is the same as training_name
+#ckpt_interval: 1
+
+resume: False
+resume_ckpt: ./ckpt/ts80/ts80-4000.pt
+ignore_opt: False
+
+#start_iter: -1 # if resume and start_iter not set, start_iter will be set to the iteration of the last checkpoint; -1 means not set
+epoch_size: 100 # after every epoch, save a checkpoint
+n_more_step: 2000 # how many opt.step() to run. It will override n_more_iter if both are set
+#n_more_sample: 2200000 # how many samples to run. It will override n_more_step
+
+batch_size: 40
+large_batch_size: 320
+seqlen: 256 # should be smaller than the max_token_len
+
+n_teacher: 1
+n_student: 1
+
+teacher_dtype: bfloat16
+student_dtype: bfloat16
+
+log_dir: ./log
+#log_name: test # by default, log_name is the same as training_name
+
+dataset_dir: ../tinystory-test/
+dataset_name_weight: # the dataset is a list of lmdb folders, and the weight is the weight of each dataset
+  ts.lmdb: 1 # the actual weight will be = w / sum(all_weight)
+
+model:
+  max_token_len: 1024 # should be larger than the seqlen
+  #vocab_size: 32000
+  n_layer: 24
+  n_head: 4
+  n_kv_head: 2 # multi-query attention
+  dim: 128
+  #dim_qk_head: 32 # usually set to dim // n_head, but can be different
+  #hidden_dim:  # 768*4, the MLP after the attention layer
+  #multiple_of: 64 # make sure the hidden_dim is a multiple of this number, beause silu (swish) is used, so hidden layer will be changed
+  dropout_rate: 0.05 # for the attention map
+  #layer_init_factor: 0.1 # by default = (n_layer * 8) ** -1/2; should use default value, based on the microsoft DeepNet paper
+  #residual_factor: 2 # by default = (2 * n_layer) ** 1/2; should use default value
+  attn_window_size: 512
+  front_window_size: 0
+  use_rotary: True
+  use_alibi: False
+
+  mimic_attn_layer: 21 # replace this layer to be a training target, to mimic the attention of the teacher; this special layer should use the similar setting as the teacher
+  mimic_n_head: 16
+  mimic_n_kv_head: 16
+  #mimic_sliding_window_size: 1024
+  mimic_attn_dropout: 0.0
+  mimic_dim_qk_head: 16
+  mimic_use_rotary: True
+  mimic_use_alibi: False
+
+opt:
+  gradient_clip: 1.0
+  lr: 1
+  beta1: 0.95
+  beta2: 0.999
+  weight_decay: 0.1
+  opt_name: lion
+
+loss:
+  soft_loss_weight: 0.3
+  hard_loss_weight: 0.3
+  mimic_loss_weight: 0.4
+  virtual_v_head_num: 16 # based on MiniLM v2, it is similar to attention but only use v to do self-attn. It make the student's x_v similar to teacher's x_v
+  loss_soft_temperature: 1 # temperature for the soft loss, to make the softmax more smooth, sensitive to the small logits
+
+scheduler:
+  slr_seg:
+    - [0.0000001, 0.0001, 300]
+    - [0.0001, 0.0001, 2000]
+
+
